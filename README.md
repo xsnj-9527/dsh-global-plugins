@@ -1,6 +1,6 @@
 # DSH 全局插件（用户级）
 
-本仓库收录给 **DeepSeek Harness (DSH)** 用的两个"全局插件"：它们不是 Cordis 插件行，而是
+本仓库收录给 **DeepSeek Harness (DSH)** 用的三个"全局插件"：它们不是 Cordis 插件行，而是
 **用户级策略文件 + 技能 + 独立脚本**的组合——这样它们对本机**所有**会话生效（含子代理），
 不受 preset 限制，也不会被 DSH 升级覆盖。
 
@@ -8,16 +8,17 @@
 |---|---|---|---|
 | 1 | **DST 创意工坊上传** | 上传要拼五层嵌套命令、单次跑 280 秒、网关超时后状态未知导致死循环 | `smart_upload.js` + `skills/dst-workshop-upload/` |
 | 2 | **开工前需求分析** | 提示词有歧义或逻辑漏洞时闷头开工，返工浪费 | `AGENTS.md` 第 1 节 + `skills/requirement-analysis/` |
+| 3 | **往 GitHub 传文件** | WSL 不读 Windows 系统代理，裸连 GitHub 间歇性整段超时；推送失败后状态不明 | `gh_push.js` + `skills/github-upload/` |
 
-> `AGENTS.md` 同时承载两个插件：第 1 节是需求分析策略，第 2 节是上传策略。
+> `AGENTS.md` 同时承载三个插件的策略：第 1 节需求分析，第 2 节创意工坊上传，第 3 节 GitHub 上传。
 
 ## 安装
 
-DSH 的用户级配置根目录是 `$DSH_HOME`（默认 `~/.dsh`）。三个动作：
+DSH 的用户级配置根目录是 `$DSH_HOME`（默认 `~/.dsh`）。四个动作：
 
 ```bash
 # 1) 用户级策略：被每个会话开场自动注入
-cp AGENTS.md "$DSH_HOME/AGENTS.md"        # 若已有，改成手动合并第 1、2 节
+cp AGENTS.md "$DSH_HOME/AGENTS.md"        # 若已有，改成手动合并第 1、2、3 节
 
 # 2) 技能：出现在所有会话的技能目录里
 mkdir -p "$DSH_HOME/skills"
@@ -25,9 +26,14 @@ cp -r skills/* "$DSH_HOME/skills/"
 
 # 3) 上传脚本
 cp smart_upload.js ~/smart_upload.js
+
+# 4) GitHub 推送脚本
+cp gh_push.js ~/gh_push.js
 ```
 
 装完**不需要重启**：策略文件在下一轮对话即生效，技能会被目录监听器自动收进目录。
+
+> 插件 3 另需一次性的环境准备（WSL → Windows 代理），见下文"插件三"。
 
 ## 插件一：DST 创意工坊上传
 
@@ -82,9 +88,49 @@ node ~/smart_upload.js --help
 
 配套技能 `skills/requirement-analysis/` 提供完整检查清单、提问模板与反例。
 
+## 插件三：往 GitHub 传文件
+
+```bash
+node ~/gh_push.js -m "提交说明"                      # 提交并推送当前仓库
+node ~/gh_push.js --repo=<目录> -m "提交说明"         # 指定仓库目录
+node ~/gh_push.js --status                          # 只体检，不推送
+node ~/gh_push.js --create=<名字> --private -m "…"    # 新建仓库并推送
+node ~/gh_push.js --dry-run                         # 演练：只扫描与预览
+```
+
+### 要解决的问题
+
+WSL **不读取 Windows 的系统代理**，所以 WSL 里的 git/gh/curl 默认走裸链路，而裸链路上
+GitHub 是**间歇性整段不可用**的。实测（2026-09-12）：
+
+| 观测 | 数据 |
+|---|---|
+| WSL 直连 `api.github.com` | 连续 **10/10 全超时** |
+| 同一时刻 Windows 走代理 | **全绿**，0.4~1.5 秒 |
+| 抖动窗口内换边缘 IP | 4 个 IP **同时**全挂 → 是链路问题，不是单点 |
+| TUN（虚拟网卡）模式 | 只对 `github.com` 有效，`api.github.com`/百度/SSH 全卡死 → **不要用** |
+
+### 一次性环境准备
+
+1. 代理客户端里开启 **`allow-lan`**（配置文件 `shared_preferences.json` 与 `config.yaml`，
+   UI 里可能没有这个开关），让代理从只监听 `127.0.0.1` 变为对 WSL 可见。
+2. 放一个 `~/.hermes/scripts/wsl-proxy.sh`：**代理端口可达时才**导出 `http_proxy/https_proxy`，
+   不可达静默跳过（梯子关掉不会把 WSL 网络弄挂）。把它 source 进 `~/.bashrc`，
+   并在 `~/.hermes/scripts/dsh-autostart.sh` 里 source 一次 → **以后每个新会话自动继承**。
+3. 可选：给 `gh` 加一个垫片（真身改名 `.gh-real`），自动走代理 + 只读命令网络错误重试。
+
+`gh_push.js` 内部自带同样的代理自举，所以即使不做第 2、3 步它也能工作；那两步是为了让
+**其它**命令（curl / pip / npm / apt / 交互式 gh）也一起受益。
+
+### 六道保险
+
+代理自举 → 密钥扫描（命中即中止）→ 双通道推送（SSH ↔ HTTPS 互为备份）→
+只重试网络错误（最多 3 次，**永不 `--force`**）→ `git ls-remote` 核对远端 SHA →
+结构化输出 `[SUCCESS]/[NOTHING_TO_PUSH]/[SECRET_FOUND]/[FAILED]` + JSON。
+
 ## 说明
 
 - 本仓库文件**不含任何密钥、令牌或密码**（已扫描确认）；
   内含的是本机绝对路径与公开的创意工坊条目 ID。
-- 两个插件按"策略 + 技能"而不是 Cordis 插件行实现是刻意的：插件行只对挂了它的 preset 生效，
-  而这两件事需要**默认对所有会话生效**；且升级 DSH 不会覆盖用户级配置。
+- 三个插件按"策略 + 技能 + 脚本"而不是 Cordis 插件行实现是刻意的：插件行只对挂了它的 preset 生效，
+  而这三件事需要**默认对所有会话生效**；且升级 DSH 不会覆盖用户级配置。

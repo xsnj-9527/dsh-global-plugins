@@ -15,7 +15,7 @@
 5. **没有问题 → 不要为了问而问**：用 2~4 行写出"目标 / 关键假设 / 计划"，然后直接干活。分析是为了少返工，不是为了走流程。
 6. **可以跳过形式化分析的场合**：纯只读查询、单步琐碎操作（看个文件、列个目录、跑个状态查询、回答一个知识问题）——直接做。
 
-更具体的既有规则优先于本节：plan 模式、动态 Cordis 插件流程、以及下面第 2 节"只允许一条命令"。
+更具体的既有规则优先于本节：plan 模式、动态 Cordis 插件流程、以及下面第 2、3 节的"只允许一条命令/一条流程"。
 
 详细检查清单与提问模板见技能 `requirement-analysis`。
 
@@ -60,3 +60,38 @@ node /home/zch2026/smart_upload.js
   等 30 秒后执行 `--status` 收结果即可；重复执行同一条命令也是安全的（幂等）。
 
 详细架构、加新模组、故障排查见技能 `dst-workshop-upload`。
+
+## 3. 往 GitHub 传文件：只允许这一条流程
+
+用户说"传到我的 GitHub / 上传到仓库 / 帮我 push / 提交代码"时，**唯一允许**的执行方式是：
+
+```
+node /home/zch2026/gh_push.js -m "提交说明"                      # 提交并推送当前仓库
+node /home/zch2026/gh_push.js --repo=<目录> -m "提交说明"         # 指定仓库目录
+node /home/zch2026/gh_push.js --status                          # 只体检（代理/鉴权/远端/待提交），不推送
+node /home/zch2026/gh_push.js --create=<名字> --private -m "…"   # 新建仓库并推送
+```
+
+前置条件只有一条：**用户的梯子（Sororain）开着**。
+脚本自己会注入 WSL→Windows 代理（与 `~/.hermes/scripts/wsl-proxy.sh` 同一套判断），代理不可达时静默跳过。
+
+**禁止事项**：
+
+- 不要在 WSL 里裸连 GitHub——裸链路会间歇性整段超时（实测 `api.github.com` 曾连续 10 次全挂，
+  而同一时刻 Windows 走代理全绿）。临时需要代理的命令先 `. ~/.hermes/scripts/wsl-proxy.sh`。
+- 不要用 `git push --force`（脚本永不使用）。
+- 不要跳过密钥扫描（脚本内置，命中即中止并报出文件与类型）。
+- **不要擅自新建公开仓库、也不要把私有仓库改成公开**——公开是不可逆的对外发布，
+  必须用户明确说 public；`--create` 必须显式二选一 `--private` / `--public`。
+- 不要混用 Windows 侧的 git / gh：WSL 侧已经有代理自举和 `gh` 垫片（含只读重试）。
+
+**怎么读结果**（与上传脚本同一套约定）：
+
+```
+[SUCCESS] / [NOTHING_TO_PUSH] / [SECRET_FOUND] / [FAILED]
+{ "status": ..., "message": ..., "commit": ..., "remoteVerified": ..., "canRetry": ..., "nextAction": ... }
+```
+
+`remoteVerified:true` 表示已用 `git ls-remote` 核对远端 SHA 与本地一致——**不要只看 push 的自述就宣称成功**。
+
+完整剧本、通道选择与排错见技能 `github-upload`。
