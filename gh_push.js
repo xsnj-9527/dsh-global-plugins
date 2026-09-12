@@ -158,7 +158,11 @@ function repoInfo(dir) {
     const top = run('git', ['rev-parse', '--show-toplevel'], { cwd: dir });
     if (!top.ok) return null;
     const root = top.stdout;
-    const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root }).stdout;
+    // 新仓库还没有任何提交时 rev-parse --abbrev-ref 只会给出 "HEAD"，
+    // 而 symbolic-ref 能给出分支真名（git init -b main 后就是 main）。
+    let branch = run('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root }).stdout;
+    if (!branch) branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root }).stdout;
+    if (!branch) branch = 'main';
     const head = run('git', ['rev-parse', 'HEAD'], { cwd: root }).stdout;
     const originUrl = run('git', ['remote', 'get-url', 'origin'], { cwd: root }).stdout || null;
     return { root, branch, head, originUrl };
