@@ -1,6 +1,6 @@
 # DSH 全局插件（用户级）
 
-本仓库收录给 **DeepSeek Harness (DSH)** 用的三个"全局插件"：它们不是 Cordis 插件行，而是
+本仓库收录给 **DeepSeek Harness (DSH)** 用的五个"全局插件"：它们不是 Cordis 插件行，而是
 **用户级策略文件 + 技能 + 独立脚本**的组合——这样它们对本机**所有**会话生效（含子代理），
 不受 preset 限制，也不会被 DSH 升级覆盖。
 
@@ -9,8 +9,11 @@
 | 1 | **DST 创意工坊上传** | 上传要拼五层嵌套命令、单次跑 280 秒、网关超时后状态未知导致死循环 | `smart_upload.js` + `skills/dst-workshop-upload/` |
 | 2 | **开工前需求分析** | 提示词有歧义或逻辑漏洞时闷头开工，返工浪费 | `AGENTS.md` 第 1 节 + `skills/requirement-analysis/` |
 | 3 | **往 GitHub 传文件** | WSL 不读 Windows 系统代理，裸连 GitHub 间歇性整段超时；推送失败后状态不明 | `gh_push.js` + `skills/github-upload/` |
+| 4 | **WSL 调 Windows 的入口** | Windows 程序经 interop 调用中文乱码（GBK 字节被按 UTF-8 解码）、参数被 PowerShell 吞掉 | `win.sh` + `AGENTS.md` 第 4 节 |
+| 5 | **用户中途插话** | 我干活时用户发的消息要等我这一回合跑完才被受理，人在干等 | `AGENTS.md` 第 5 节 + `skills/midtask-interrupt/` |
 
-> `AGENTS.md` 同时承载三个插件的策略：第 1 节需求分析，第 2 节创意工坊上传，第 3 节 GitHub 上传。
+> `AGENTS.md` 按节承载这五个插件的策略：第 1 节需求分析、第 2 节创意工坊上传、第 3 节 GitHub 上传、
+> 第 4 节 Windows 命令、第 5 节中途插话。
 
 ## 安装
 
@@ -128,12 +131,73 @@ GitHub 是**间歇性整段不可用**的。实测（2026-09-12）：
 只重试网络错误（最多 3 次，**永不 `--force`**）→ `git ls-remote` 核对远端 SHA →
 结构化输出 `[SUCCESS]/[NOTHING_TO_PUSH]/[SECRET_FOUND]/[FAILED]` + JSON。
 
+## 插件四：WSL 调 Windows 的入口（win / winps）
+
+Windows 程序经 WSL interop 调用时按 OEM 代码页 936 吐字节，而 DSH 一律按 UTF-8 解码，
+于是中文全变 `����`；经 cmd / PowerShell 5.1 转发还会吞引号、合并参数（实测 6 个参数变 5 个）。
+
+`win.sh` 把这条路收成一个入口：直接 interop 启动、按「BOM → 严格 UTF-8 校验 → GBK936」判定解码、
+`winps` 前置 UTF-8 输出编码（这是本机唯一能救回 `✓`、emoji 这类 GBK 表示不了的字符的办法）。
+
+```bash
+win <程序> [参数...]        # 例如 win whoami / win node -v
+winps '<PowerShell 代码>'   # 默认 PowerShell 7，自动钉 UTF-8
+```
+
+完整取舍、实测记录见 `AGENTS.md` 第 4 节与 `win.sh` 头部注释。
+
+## 插件五：用户中途插话（立刻停手、保留进度、快速响应）
+
+### 要解决的问题
+
+用户在我干活时发消息，默认行为是 `queue`：**要等我这一回合跑完才被受理**，人只能干等。
+本仓库交付的是两半：把投递通道换成 `steer`（机制），加上"收到就停手"的响应纪律（行为）。
+
+### 机制（DSH 真实实现）
+
+DSH 的 agent inbox 有两个投递目标：
+
+| 通道 | API | 语义 |
+|---|---|---|
+| `next-turn` | `agent.followup(msg)` | 排队，等当前回合跑完才作为新回合受理 |
+| `next-step` | `agent.steer(msg)` | 在**下一个步骤边界**注入，当前回合继续跑但模型立刻能看到 |
+
+Web 端按「忙碌时按回车」偏好决定用哪条，默认 `queue`。改法（热加载，无需重启）：
+
+```yaml
+# ~/.dsh/settings.yaml
+ui-conversation:
+  busyEnter: steer
+```
+
+GUI 设置里也有对应开关；**Ctrl / Cmd + Enter 取反**（偏好 steer 时按它就是排队）。
+
+**边界（要说清楚）**：steer 只在我两次工具调用之间可见——正在跑的原子命令无法中断。
+所以一条阻塞 3 分钟的命令 = 插话最多也要等 3 分钟。
+→ 纪律：单个阻塞命令 **≤ ~30 秒**，长任务用后台 job + 短轮询，边界才够快。
+DSH 目前也**没有**"只中断当前步骤、保留本回合"的能力（`cancel()` 默认连 inbox 一起清空）。
+
+### 响应纪律（`AGENTS.md` 第 5 节）
+
+```
+1. 停手     不再启动新任务/新命令；后台 job 记下 id
+2. 保留进度 1~3 行写清「已完成 / 未完成 / 下一步」，半成品落盘或指明位置
+3. 快速响应 先结论后上下文，不写长篇报告，不重复已说过的内容
+4. 等指示   说继续就从保留点接着做，说改方向就按新的来
+```
+
+### 本机实测证据
+
+同一会话的日志统计（设置改动之前）：用户消息 **18 条走 `next-turn`（排队）**，
+仅 **2 条**尝试 `next-step` 且因窗口关闭被降级回 queue —— 这正是"发消息要等我跑完"的直接证据。
+读法：会话日志里每个 `agent/inbox/spliced` 事件的 `target` 字段即投递通道。
+
 ## 说明
 
 - 本仓库文件**不含任何密钥、令牌或密码**（已扫描确认）；
   内含的是本机绝对路径与公开的创意工坊条目 ID。
-- 三个插件按"策略 + 技能 + 脚本"而不是 Cordis 插件行实现是刻意的：插件行只对挂了它的 preset 生效，
-  而这三件事需要**默认对所有会话生效**；且升级 DSH 不会覆盖用户级配置。
+- 这些插件按"策略 + 技能 + 脚本"而不是 Cordis 插件行实现是刻意的：插件行只对挂了它的 preset 生效，
+  而这些需求要**默认对所有会话生效**；且升级 DSH 不会覆盖用户级配置。
 
 ## License
 
