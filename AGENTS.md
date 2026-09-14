@@ -1,6 +1,6 @@
 # 用户级执行策略（对本机所有会话生效）
 
-## 1. 开工前的需求分析（默认对每个任务生效）
+## 1. Requirement Gate · 开工前的需求分析（默认对每个任务生效）
 
 接到任何任务时，**先分析需求，再动手**：
 
@@ -19,7 +19,7 @@
 
 详细检查清单与提问模板见技能 `requirement-analysis`。
 
-## 2. DST 创意工坊上传：只允许一条命令
+## 2. Workshop Publisher · DST 创意工坊上传：只允许一条命令
 
 任何"把《饥荒联机版》模组上传到 Steam 创意工坊"的任务，**唯一允许**的执行方式是：
 
@@ -61,7 +61,7 @@ node /home/zch2026/smart_upload.js
 
 详细架构、加新模组、故障排查见技能 `dst-workshop-upload`。
 
-## 3. 往 GitHub 传文件：只允许这一条流程
+## 3. GitHub Publisher · 往 GitHub 传文件：只允许这一条流程
 
 用户说"传到我的 GitHub / 上传到仓库 / 帮我 push / 提交代码"时，**唯一允许**的执行方式是：
 
@@ -96,7 +96,7 @@ node /home/zch2026/gh_push.js --create=<名字> --private -m "…"   # 新建仓
 
 完整剧本、通道选择与排错见技能 `github-upload`。
 
-## 4. 跨到 Windows 的命令：只走 `win` / `winps`
+## 4. Windows Bridge · 跨到 Windows 的命令：只走 `win` / `winps`
 
 WSL 里调 Windows 程序时，**唯一允许**的执行方式是这两个命令（2026-09-13 落地并实测）：
 
@@ -145,7 +145,7 @@ winps [--ps5] '<PowerShell 代码>'
 
 完整实现、自测记录与设计取舍见 `~/.hermes/scripts/win.sh`（`~/.local/bin/win` 与 `winps` 是它的软链）。
 
-## 5. 用户中途插话：立刻停手、保留进度、快速响应
+## 5. Interrupt Handler · 用户中途插话：立刻停手、保留进度、快速响应
 
 机制：本机已把「忙碌时按回车」设为 `steer`（`~/.dsh/settings.yaml` 的 `ui-conversation.busyEnter`）。
 所以用户在我干活时发来的消息，会在**我下一个步骤边界**注入进来，而不是等我这一回合跑完。

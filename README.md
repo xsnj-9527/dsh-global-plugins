@@ -4,13 +4,17 @@
 **用户级策略文件 + 技能 + 独立脚本**的组合——这样它们对本机**所有**会话生效（含子代理），
 不受 preset 限制，也不会被 DSH 升级覆盖。
 
-| # | 插件 | 解决的问题 | 组成 |
-|---|---|---|---|
-| 1 | **DST 创意工坊上传** | 上传要拼五层嵌套命令、单次跑 280 秒、网关超时后状态未知导致死循环 | `smart_upload.js` + `skills/dst-workshop-upload/` |
-| 2 | **开工前需求分析** | 提示词有歧义或逻辑漏洞时闷头开工，返工浪费 | `AGENTS.md` 第 1 节 + `skills/requirement-analysis/` |
-| 3 | **往 GitHub 传文件** | WSL 不读 Windows 系统代理，裸连 GitHub 间歇性整段超时；推送失败后状态不明 | `gh_push.js` + `skills/github-upload/` |
-| 4 | **WSL 调 Windows 的入口** | Windows 程序经 interop 调用中文乱码（GBK 字节被按 UTF-8 解码）、参数被 PowerShell 吞掉 | `win.sh` + `AGENTS.md` 第 4 节 |
-| 5 | **用户中途插话** | 我干活时用户发的消息要等我这一回合跑完才被受理，人在干等 | `AGENTS.md` 第 5 节 + `skills/midtask-interrupt/` |
+| # | Name | 中文名 | 具体功能 | 组成 |
+|---|---|---|---|---|
+| 1 | **Workshop Publisher** | DST 创意工坊上传器 | 一条命令把《饥荒联机版》模组发布/更新到 Steam 创意工坊。上传前先向 Steam 查询远程是否已是同一份内容，是则直接返回成功（幂等）；内容有变才打包上传。原生 Windows 图标编译、单次请求 15s / 引擎 150s / 同步等待 60s 三层硬超时，结束时固定输出状态码与 JSON（含 `canRetry`、`nextAction`） | `smart_upload.js` + `skills/dst-workshop-upload/` |
+| 2 | **Requirement Gate** | 开工前需求闸门 | 接到任务先做需求分析再动手：复述目标与验收标准，检查四类漏洞（表意不明 / 逻辑漏洞 / 缺关键参数 / 高风险不可逆）；能自己读代码查到的事实不许问，确有真问题就用一次 `ask_user_question`（≤3 条、带候选）敲定后再开工，没问题则直接干 | `AGENTS.md` 第 1 节 + `skills/requirement-analysis/` |
+| 3 | **GitHub Publisher** | GitHub 仓库推送器 | 一条命令提交并推送文件到 GitHub 仓库。自动探测并注入 WSL→Windows 代理、提交前密钥扫描（命中即中止）、SSH 与 HTTPS 双通道互为备份、只重试网络类错误（最多 3 次、永不 `--force`），最后用 `git ls-remote` 核对远端 SHA 而不是轻信 push 自述 | `gh_push.js` + `skills/github-upload/` |
+| 4 | **Windows Bridge** | WSL→Windows 调用桥 | 把 WSL 调 Windows 程序收成一个入口，修掉两个真实坑：Windows 控制台按 GBK 吐字节被当 UTF-8 解码导致中文全是乱码；经 PowerShell 5.1 转发会吞引号、合并参数。按「BOM → 严格 UTF-8 → GBK936」判定解码，`winps` 自动钉 UTF-8 输出编码 | `win.sh` + `AGENTS.md` 第 4 节 |
+| 5 | **Interrupt Handler** | 中途插话响应器 | 用户在我干活时发来的消息改为在**下一个步骤边界注入**（steer），而不是排队等我跑完这一回合；收到后立刻停手、用 1~3 行保留进度（已完成/未完成/下一步），先给结论再给上下文 | `AGENTS.md` 第 5 节 + `skills/midtask-interrupt/` |
+
+> **命名约定**：`Name` 是展示名（英文、专业、对应功能）；技能标识与脚本文件名保持原样
+> （`skills/dst-workshop-upload/`、`smart_upload.js` 等）——`AGENTS.md` 的指令与其它会话
+> 都按这些路径调用，重命名会破坏既有引用。
 
 > `AGENTS.md` 按节承载这五个插件的策略：第 1 节需求分析、第 2 节创意工坊上传、第 3 节 GitHub 上传、
 > 第 4 节 Windows 命令、第 5 节中途插话。

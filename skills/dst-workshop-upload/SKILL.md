@@ -3,7 +3,7 @@ name: dst-workshop-upload
 description: Use when uploading, updating, or checking a Don't Starve Together (《饥荒联机版》) mod on the Steam Workshop for this user — 上传/更新/查询创意工坊、伍迪真无敌、双生花、smart_upload.js、或者任何涉及 D:\\*_upload、ModUploader、steamworks.js 的上传任务。
 ---
 
-# DST 创意工坊上传（smart_upload.js）
+# Workshop Publisher · DST 创意工坊上传（smart_upload.js）
 
 ## 一条命令，别无其他
 

@@ -3,7 +3,7 @@ name: midtask-interrupt
 description: Use when the user sends a message while you are mid-task (steering input), or when configuring/verifying how DSH delivers messages sent during a running turn — 中途插话、忙碌时回车、steer、queue、立刻停手保留进度快速响应、busyEnter 设置。
 ---
 
-# 用户中途插话：立刻停手、保留进度、快速响应
+# Interrupt Handler · 用户中途插话：立刻停手、保留进度、快速响应
 
 ## 机制（DSH 真实实现，非推测）
 

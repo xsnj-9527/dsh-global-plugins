@@ -3,7 +3,7 @@ name: github-upload
 description: Use when uploading, pushing, or committing files to a GitHub repository for this user — 往 GitHub 传文件、提交代码、push、新建仓库并上传、gh_push.js、或者遇到 WSL 里 GitHub 连不上/超时/失败重试。
 ---
 
-# 往 GitHub 传文件（gh_push.js）
+# GitHub Publisher · 往 GitHub 传文件（gh_push.js）
 
 ## 一条命令，别无其他
 

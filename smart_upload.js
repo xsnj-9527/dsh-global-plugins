@@ -2,7 +2,7 @@
 'use strict';
 
 /* ============================================================================
- * smart_upload.js —— 《饥荒联机版》Steam 创意工坊 · 单命令幂等上传器
+ * smart_upload.js —— Workshop Publisher · 《饥荒联机版》Steam 创意工坊上传器
  * ----------------------------------------------------------------------------
  * 为什么存在：以前上传要经过 Bash -> Python -> PowerShell -> schtasks -> 交互式
  * 会话 -> node upload.js，命令长、等待 280 秒、跑到一半网关超时，于是"状态未知"
@@ -53,6 +53,14 @@ const DEFAULT_HARD_TIMEOUT_SEC = 150; // Windows 侧上传引擎的硬超时
 
 /** 模组登记表：新增模组只要在这里加一行（或用 --src= 临时指定）。 */
 const MODS = {
+    pangu: {
+        title: '伍迪？！盘古？！ Woodie?! Pangu?!',
+        expect: '伍迪',
+        src: '/home/zch2026/pangu_mod',
+        uploadDir: '/mnt/d/pangu_upload',
+        itemId: '3800732633',
+        tags: ['character'],
+    },
     woodie: {
         title: '伍迪真无敌 Woodie The Invincible',
         expect: '伍迪真无敌',

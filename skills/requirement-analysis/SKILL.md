@@ -3,7 +3,7 @@ name: requirement-analysis
 description: Use at the start of any non-trivial user task to analyze the request for ambiguity, logical holes, missing parameters, or risky-and-irreversible actions before starting work, and to ask the user a single consolidated round of clarifying questions when real problems exist — 需求分析、提示词有歧义、表意不明、逻辑漏洞、先问清楚再开工。
 ---
 
-# 开工前的需求分析
+# Requirement Gate · 开工前的需求分析
 
 用户级策略 `~/.dsh/AGENTS.md` 第 1 节要求：**每个任务先分析需求，再动手**。本技能是那一步的完整做法。
 

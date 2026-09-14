@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# win / winps — WSL → Windows 调用的唯一入口
+# win / winps — Windows Bridge · WSL → Windows 调用的唯一入口
 #
 # 背景（2026-09-13 实测于本机 Win11 26200 / zh-CN / 代码页 936）：
 #
